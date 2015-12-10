@@ -10,20 +10,25 @@ var zeroPad = true;
 var client, nextMessageOut, nextMessageIn;
 var startTime, lastTime;
 
-var aedesServer;
-var launchServer = launchAedes;
-var killServer = killAedes;
-
+//uncomment below for Mosquitto
 /*
-
- var moscaServer;
- var launchServer = launchMosca;
- var killServer = killMosca;
-
  var mosquittoServer;
  var launchServer = launchMosquitto;
  var killServer = killMosquitto;
+ */
 
+//uncomment below for Mosca
+/*
+ var moscaServer;
+ var launchServer = launchMosca;
+ var killServer = killMosca;
+ */
+
+//uncomment below for Aedes
+/*
+ var aedesServer;
+ var launchServer = launchAedes;
+ var killServer = killAedes;
  */
 
 describe("All the tests", function(){
@@ -55,6 +60,7 @@ describe("All the tests", function(){
     });
 
     it("Can receive synchronous retained messages", function(done) {
+        console.log("Can receive synchronous retained messages");
         client.on("message", function(topic, bytes, packet){
             receive(bytes, done);
         });
@@ -72,7 +78,9 @@ describe("All the tests", function(){
         });
     });
 
+    /*
     it("Can receive previous retained messages", function(done){
+        console.log("Can receive previous retained messages");
         client.on("message", function(topic, bytes, packet){
             receive(bytes, done);
         });
@@ -95,8 +103,10 @@ describe("All the tests", function(){
             }
         }
     });
+    */
 
     it("Can ping back messages to test roundtrip time", function(done){
+        console.log("Can ping back messages to test roundtrip time");
         client.on("message", function(topic, bytes, packet){
             receive(bytes, done); //receive message
             if(nextMessageOut < targetCount) {
