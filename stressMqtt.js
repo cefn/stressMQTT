@@ -78,7 +78,6 @@ describe("All the tests", function(){
         });
     });
 
-    /*
     it("Can receive previous retained messages", function(done){
         console.log("Can receive previous retained messages");
         client.on("message", function(topic, bytes, packet){
@@ -103,7 +102,6 @@ describe("All the tests", function(){
             }
         }
     });
-    */
 
     it("Can ping back messages to test roundtrip time", function(done){
         console.log("Can ping back messages to test roundtrip time");
