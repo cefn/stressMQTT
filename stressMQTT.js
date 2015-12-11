@@ -2,34 +2,38 @@
 
 var mqtt = require("mqtt");
 
+var spawnServer = true;
+
+var serverLib = "./moscaServer.js";
+//var serverLib = "./aedesServer.js";
+//var serverLib = "./mosquittoServer.js";
+
 var uri = "ws://127.0.0.1:3000";
-var targetCount = 100;
+var targetCount = 10000;
 var requireOrder = true;
 var zeroPad = true;
 
 var client, nextMessageOut, nextMessageIn;
 var startTime, lastTime;
 
-//uncomment below for Mosquitto
-/*
- var mosquittoServer;
- var launchServer = launchMosquitto;
- var killServer = killMosquitto;
- */
-
-//uncomment below for Mosca
-/*
- var moscaServer;
- var launchServer = launchMosca;
- var killServer = killMosca;
- */
-
-//uncomment below for Aedes
-/*
- var aedesServer;
- var launchServer = launchAedes;
- var killServer = killAedes;
- */
+var daemon = null;
+function loadDaemon(cb){
+    if(daemon){
+        cb(daemon);
+    }
+    else{
+        if(spawnServer){
+            daemon = new (require("./servers/forkingServer.js").Daemon)();
+            daemon.loadLib(serverLib, function(){
+                cb(daemon);
+            });
+        }
+        else{
+            daemon = new (require("./servers/" + serverLib).Daemon)();
+            cb(daemon);
+        }
+    }
+}
 
 describe("All the tests", function(){
 
@@ -37,23 +41,26 @@ describe("All the tests", function(){
         resetTimestamp();
         nextMessageOut = 0;
         nextMessageIn = 0;
-        launchServer(function(){
-            client = mqtt.connect(uri);
-            client.on("error", function(err){
-                timestamp("Error:" + err.toString());
-                throw err;
+
+        loadDaemon(function(){
+            daemon.launch(function(){
+                client = mqtt.connect(uri);
+                client.on("error", function(err){
+                    timestamp("Error:" + err.toString());
+                    throw err;
+                });
+                client.on("connect", function(){
+                    timestamp("Connected");
+                    done();
+                })
             });
-            client.on("connect", function(){
-                timestamp("Connected");
-                done();
-            })
         });
     });
 
     afterEach(function(done){
         client.end(true, function(){
             client = null;
-            killServer(function(){
+            daemon.kill(function(){
                 done();
             });
         });
@@ -179,57 +186,3 @@ function timestamp(report){
     lastTime = time;
 }
 
-function launchAedes(cb){
-    var http = require("http"),
-        websocketStream = require("websocket-stream"),
-        aedesPersistence = require('aedes-persistence'),
-        aedes = require('aedes');
-    var aedesStore = aedesPersistence();
-    var aedesInstance = aedes({persistence:aedesStore});
-    var httpServer = http.createServer();
-    var websocketServer = websocketStream.createServer({server: httpServer}, aedesInstance.handle);
-    aedesServer = httpServer;
-    httpServer.listen(3000, cb);
-}
-
-function killAedes(cb){
-    aedesServer.close(cb);
-}
-
-function launchMosquitto(cb){
-    var child_process = require("child_process"),
-        spawn = child_process.spawn;
-    mosquittoServer = spawn("/usr/local/sbin/mosquitto", ["--config-file", "./mosquitto.conf", "--verbose"], {cwd:__dirname});
-    cb(); //TODO should something be awaited in Posixland?
-}
-
-function killMosquitto(cb){
-    mosquittoServer.kill("SIGINT");
-    mosquittoServer.on("exit", function(){
-        cb();
-    })
-}
-
-function launchMosca(cb){
-    var mosca = require("mosca");
-    var moscaSettings = {
-        maxInflightMessages: 1024,
-        persistence: {
-            factory: mosca.persistence.Memory
-        },
-        http:{
-            port:3000,
-            static:false,
-            bundle:false
-        },
-        onlyHttp:true
-    };
-    moscaServer = new mosca.Server(moscaSettings, cb);
-}
-
-function killMosca(cb){
-    moscaServer.close(function(){
-        moscaServer = null;
-        cb();
-    });
-}
