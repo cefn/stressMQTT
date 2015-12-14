@@ -1,0 +1,32 @@
+Timestamp reset
+0 Connected
+Can receive synchronous retained messages
+1:1 Subscribing
+16:15 Subscribed
+16:0 Subscribed
+17:1 Sent first message
+28:11 Sent 100 messages in 11 ms at 0.11ms/msg
+60:32 Received first message after 43 ms
+439:379 Received 100 messages in 379 ms at 3.79ms/msg
+
+Timestamp reset
+0 Connected
+Can receive previous retained messages
+1:1 Sent first message
+8:7 Sent 100 messages in 7 ms at 0.07ms/msg
+8:0 Sent 100 messages in 7 ms at 0.07ms/msg
+220:212 Subscribing
+231:11 Subscribed
+275:44 Received first message after 44 ms
+397:122 Received 100 messages in 122 ms at 1.22ms/msg
+
+Timestamp reset
+0 Connected
+Can ping back messages to test roundtrip time
+0:0 Subscribing
+2:2 Subscribed
+2:0 Subscribed
+2:0 Sent first message
+6:4 Received first message after 4 ms
+430:424 Sent 100 messages in 428 ms at 4.28ms/msg
+433:3 Received 100 messages in 427 ms at 4.27ms/msg433:0 Sent 100 messages in 431 ms at 4.31ms/msg
