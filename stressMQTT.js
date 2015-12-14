@@ -7,14 +7,15 @@ var spawnBroker = true;
 var serverType = "mosca";
 //var serverType = "aedes";
 //var serverType = "mosquitto";
+var logVerbose = false;
 
 var uri = "ws://127.0.0.1:3000";
-var targetCount = 100;                //the number of messages to be sent and received
+var targetCount = 1000;                //the number of messages to be sent and received
 var requireOrder = true;                //check that messages are delivered in numerical order (the order they were sent)
 var zeroPadTopics = true;               //workaround for out-of-order lexically-based delivery from mosca
 var ignoreReconnectionErrors = true;    //ignore duplicate 'onconnect' events from Mosca or Aedes
 
-var client, nextMessageOut, nextMessageIn;
+var client, nextMessageOut, nextMessageIn, subscribeStart, sendStart, receiveStart;
 var startTime, lastTime;
 
 var daemon = null;
@@ -42,6 +43,10 @@ describe("All the tests", function(){
         resetTimestamp();
         nextMessageOut = 0;
         nextMessageIn = 0;
+
+        subscribeStart = -1;
+        sendStart = -1;
+        receiveStart = -1;
 
         loadDaemon(function(){
             daemon.launch(function(){
@@ -79,7 +84,8 @@ describe("All the tests", function(){
         client.on("message", function(topic, bytes, packet){
             receive(bytes, done);
         });
-        client.subscribe('#', { qos:1 }, function(err, granted){
+        timestamp("Subscribing");
+        subscribe(function(err, granted){
             if(err) {
                 throw err;
             }
@@ -105,15 +111,10 @@ describe("All the tests", function(){
             }
             else{
                 send(function(){ //wait for ack before triggering subscription
-                    client.subscribe('#', { qos:1 }, function(err, granted){
-                        if(err) {
-                            throw err;
-                        }
-                        else {
-                            timestamp("Subscribed");
-                        }
-                    });
-                })
+                    timestamp("Subscribing");
+                    subscribe();
+                });
+                reportSend();
             }
         }
     });
@@ -125,8 +126,12 @@ describe("All the tests", function(){
             if(nextMessageOut < targetCount) {
                 send(); //send next message
             }
+            else{
+                reportSend();
+            }
         });
-        client.subscribe('#', { qos:1 }, function(err, granted){
+        timestamp("Subscribing");
+        subscribe(function(err, granted){
             if(err) {
                 throw err;
             }
@@ -138,30 +143,83 @@ describe("All the tests", function(){
     });
 });
 
+function resetSubscribe(){
+    subscribeStart = Date.now();
+    timestamp("Subscribed");
+}
+
+function resetSend(){
+    sendStart = Date.now();
+    timestamp("Sent first message");
+}
+
+function resetReceive(){
+    var initiated = Math.max(subscribeStart, sendStart);
+    timestamp("Received first message after " + (Date.now() - initiated) + " ms" );
+    receiveStart = Date.now();
+}
+
+function reportSend(){
+    var period = Date.now() - sendStart;
+    timestamp("Sent " + nextMessageOut + " messages in " + period + " ms at " + (period / nextMessageOut) + "ms/msg");
+}
+
+function reportReceive(){
+    var period = Date.now() - receiveStart;
+    timestamp("Received " + nextMessageIn + " messages in " + period + " ms at " + (period / nextMessageIn) + "ms/msg");
+}
+
+
 function pad(n, width, z) {
     z = z || '0';
     n = n + '';
     return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
 }
 
-function send(acked){
-    timestamp("Sending msg:" + nextMessageOut);
-    var topic = "/" + (zeroPadTopics? pad(nextMessageOut,4): nextMessageOut);
-    var payload = nextMessageOut.toString();
-    client.publish(topic, payload, { qos:1, retain:true }, function(err, result){
+
+
+var publishOpts = { qos:1, retain:true };
+
+function subscribe(acked){
+    resetSubscribe();
+    client.subscribe('#', { qos:1 }, function(err, granted){
         if(err) {
             throw err;
         }
-        if(acked) {
-            acked();
+        else {
+            if(acked){
+                acked();
+            }
         }
     });
+}
+
+function send(acked){
+    if(nextMessageOut===0) resetSend();
+    if(logVerbose) timestamp("Sending msg:" + nextMessageOut);
+    var topic = "/" + (zeroPadTopics? pad(nextMessageOut,4): nextMessageOut);
+    var payload = nextMessageOut.toString();
+    if(acked){
+        client.publish(topic, payload, publishOpts, function(err, result){
+            if(err) {
+                throw err;
+            }
+            if(acked) {
+                acked();
+            }
+        });
+    }
+    else{
+        client.publish(topic, payload, publishOpts)
+    }
     nextMessageOut++;
+    if(nextMessageOut===targetCount) reportSend();
 }
 
 function receive(bytes, done){
+    if(nextMessageIn===0) resetReceive();
     var parsedMessageIn = Number(bytes.toString());
-    timestamp("Received msg:" + parsedMessageIn);
+    if(logVerbose) timestamp("Received msg:" + parsedMessageIn);
     if(requireOrder && parsedMessageIn !== nextMessageIn){
         var errorMsg = "Out of order: expecting " + nextMessageIn + " but received " + parsedMessageIn;
         timestamp(errorMsg);
@@ -169,6 +227,7 @@ function receive(bytes, done){
     }
     nextMessageIn++;
     if(nextMessageIn === targetCount) {
+        reportReceive();
         done();
     }
 }
