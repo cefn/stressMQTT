@@ -5,7 +5,7 @@ function Daemon() {}
 Daemon.prototype = {
     launch:function(cb){
         var moscaSettings = {
-            maxInflightMessages: 20000,
+            maxInflightMessages: 2048,
             persistence: {
                 factory: mosca.persistence.Memory
             },

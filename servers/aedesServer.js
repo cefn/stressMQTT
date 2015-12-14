@@ -9,7 +9,7 @@ Daemon.prototype = {
     launch:function(cb){
         var aedesStore = aedesPersistence();
         var aedesInstance = aedes({
-            concurrency:20000,
+            concurrency:2048,
             persistence:aedesStore,
         });
         var httpServer = http.createServer();
