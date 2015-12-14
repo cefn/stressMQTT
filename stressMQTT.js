@@ -2,16 +2,17 @@
 
 var mqtt = require("mqtt");
 
-var spawnServer = true;
+var spawnBroker = true;
 
-var serverLib = "./moscaServer.js";
-//var serverLib = "./aedesServer.js";
-//var serverLib = "./mosquittoServer.js";
+//var serverType = "mosca";
+var serverType = "aedes";
+//var serverType = "mosquitto";
 
 var uri = "ws://127.0.0.1:3000";
-var targetCount = 10000;
-var requireOrder = true;
-var zeroPad = true;
+var targetCount = 10000;                //the number of messages to be sent and received
+var requireOrder = true;                //check that messages are delivered in numerical order (the order they were sent)
+var zeroPadTopics = true;               //workaround for out-of-order lexically-based delivery from mosca
+var ignoreReconnectionErrors = true;    //ignore duplicate 'onconnect' events from Mosca or Aedes
 
 var client, nextMessageOut, nextMessageIn;
 var startTime, lastTime;
@@ -22,14 +23,14 @@ function loadDaemon(cb){
         cb(daemon);
     }
     else{
-        if(spawnServer){
+        if(spawnBroker){
             daemon = new (require("./servers/forkingServer.js").Daemon)();
-            daemon.loadLib(serverLib, function(){
+            daemon.loadLib("./" + serverType + "Server.js", function(){
                 cb(daemon);
             });
         }
         else{
-            daemon = new (require("./servers/" + serverLib).Daemon)();
+            daemon = new (require("./servers/" + serverType + "Server.js").Daemon)();
             cb(daemon);
         }
     }
@@ -49,9 +50,16 @@ describe("All the tests", function(){
                     timestamp("Error:" + err.toString());
                     throw err;
                 });
+                var awaitingFirstConnection = true;
                 client.on("connect", function(){
-                    timestamp("Connected");
-                    done();
+                    if(awaitingFirstConnection){
+                        awaitingFirstConnection = false;
+                        timestamp("Connected");
+                        done();
+                    }
+                    else if(!ignoreReconnectionErrors){
+                        done("Spurious reconnection");
+                    }
                 })
             });
         });
@@ -138,7 +146,7 @@ function pad(n, width, z) {
 
 function send(acked){
     timestamp("Sending msg:" + nextMessageOut);
-    var topic = "/" + (zeroPad? pad(nextMessageOut,4): nextMessageOut);
+    var topic = "/" + (zeroPadTopics? pad(nextMessageOut,4): nextMessageOut);
     var payload = nextMessageOut.toString();
     client.publish(topic, payload, { qos:1, retain:true }, function(err, result){
         if(err) {
@@ -164,7 +172,6 @@ function receive(bytes, done){
         done();
     }
 }
-
 
 resetTimestamp();
 
