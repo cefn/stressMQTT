@@ -8,7 +8,10 @@ function Daemon(){}
 Daemon.prototype = {
     launch:function(cb){
         var aedesStore = aedesPersistence();
-        var aedesInstance = aedes({persistence:aedesStore});
+        var aedesInstance = aedes({
+            concurrency:20000,
+            persistence:aedesStore,
+        });
         var httpServer = http.createServer();
         var websocketServer = websocketStream.createServer({server: httpServer}, aedesInstance.handle);
         this.server = httpServer;
