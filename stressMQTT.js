@@ -4,12 +4,12 @@ var mqtt = require("mqtt");
 
 var spawnBroker = true;
 
-//var serverType = "mosca";
-var serverType = "aedes";
+var serverType = "mosca";
+//var serverType = "aedes";
 //var serverType = "mosquitto";
 
 var uri = "ws://127.0.0.1:3000";
-var targetCount = 10000;                //the number of messages to be sent and received
+var targetCount = 100;                //the number of messages to be sent and received
 var requireOrder = true;                //check that messages are delivered in numerical order (the order they were sent)
 var zeroPadTopics = true;               //workaround for out-of-order lexically-based delivery from mosca
 var ignoreReconnectionErrors = true;    //ignore duplicate 'onconnect' events from Mosca or Aedes
