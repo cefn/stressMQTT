@@ -6,6 +6,7 @@
   "dependencies": {
     "aedes": "^0.11.0",
     "aedes-persistence": "^1.0.1",
+    "child-process-debug": "0.0.7",
     "mocha": "^2.3.4",
     "mosca": "^0.32.1",
     "mqtt": "^1.5.0",
