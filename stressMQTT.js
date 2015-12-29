@@ -7,15 +7,18 @@ var spawnBroker = true;
 var serverType = "mosca";
 //var serverType = "aedes";
 //var serverType = "mosquitto";
-var logVerbose = false;
+var logVerbose = true;
 
 var uri = "ws://127.0.0.1:3000";
-var targetCount = 1000;                //the number of messages to be sent and received
+var subscribeOpts = { qos:1 };
+var publishOpts = { qos:1, retain:true };
+
+var targetCount = 10000;                //the number of messages to be sent and received
 var requireOrder = true;                //check that messages are delivered in numerical order (the order they were sent)
 var zeroPadTopics = true;               //workaround for out-of-order lexically-based delivery from mosca
 var ignoreReconnectionErrors = true;    //ignore duplicate 'onconnect' events from Mosca or Aedes
 
-var client, nextMessageOut, nextMessageIn, subscribeStart, sendStart, receiveStart;
+var client, nextSubscription, nextMessageOut, nextMessageIn, subscribeStart, sendStart, receiveStart;
 var startTime, lastTime;
 
 var daemon = null;
@@ -41,6 +44,7 @@ describe("All the tests", function(){
 
     beforeEach(function(done){
         resetTimestamp();
+        nextSubscription = 0;
         nextMessageOut = 0;
         nextMessageIn = 0;
 
@@ -79,13 +83,14 @@ describe("All the tests", function(){
         });
     });
 
-    it("Can receive synchronous retained messages", function(done) {
+    it("Wildcard subscription of synchronous messages", function(done) {
         console.log("Can receive synchronous retained messages");
         client.on("message", function(topic, bytes, packet){
             receive(bytes, done);
         });
         timestamp("Subscribing");
-        subscribe(function(err, granted){
+        resetSubscribe();
+        subscribeAll(function(err, granted){
             if(err) {
                 throw err;
             }
@@ -99,8 +104,8 @@ describe("All the tests", function(){
         });
     });
 
-    it("Can receive previous retained messages", function(done){
-        console.log("Can receive previous retained messages");
+    it("Wildcard subscription of retained messages", function(done){
+        console.log("Wildcard subscription of retained messages");
         client.on("message", function(topic, bytes, packet){
             receive(bytes, done);
         });
@@ -112,7 +117,31 @@ describe("All the tests", function(){
             else{
                 send(function(){ //wait for ack before triggering subscription
                     timestamp("Subscribing");
-                    subscribe();
+                    resetSubscribe();
+                    subscribeAll();
+                });
+                reportSend();
+            }
+        }
+    });
+
+    it("Individual subscription of retained messages", function(done){
+        console.log("Individual subscription of retained messages");
+        client.on("message", function(topic, bytes, packet){
+            receive(bytes, done);
+        });
+        var i;
+        for (i = 0; i < targetCount; i++) {
+            if(i < targetCount - 1){
+                send(); //don't provide ack callback
+            }
+            else{
+                send(function(){ //wait for ack before triggering subscription
+                    timestamp("Subscribing");
+                    var i;
+                    for (i = 0; i < targetCount; i++) {
+                        subscribeTopic();
+                    }
                 });
                 reportSend();
             }
@@ -131,7 +160,7 @@ describe("All the tests", function(){
             }
         });
         timestamp("Subscribing");
-        subscribe(function(err, granted){
+        subscribeAll(function(err, granted){
             if(err) {
                 throw err;
             }
@@ -141,6 +170,7 @@ describe("All the tests", function(){
             }
         });
     });
+
 });
 
 function resetSubscribe(){
@@ -169,6 +199,11 @@ function reportReceive(){
     timestamp("Received " + nextMessageIn + " messages in " + period + " ms at " + (period / nextMessageIn) + "ms/msg");
 }
 
+function reportSubscribe(){
+    var period = Date.now() - subscribeStart;
+    timestamp("Subscribed to " + nextSubscription + " topics in " + period + " ms at " + (period / nextSubscription) + "ms/topic");
+}
+
 
 function pad(n, width, z) {
     z = z || '0';
@@ -176,13 +211,8 @@ function pad(n, width, z) {
     return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
 }
 
-
-
-var publishOpts = { qos:1, retain:true };
-
-function subscribe(acked){
-    resetSubscribe();
-    client.subscribe('#', { qos:1 }, function(err, granted){
+function subscribeAll(acked){
+    client.subscribe('#', subscribeOpts, function(err, granted){
         if(err) {
             throw err;
         }
@@ -193,6 +223,25 @@ function subscribe(acked){
         }
     });
 }
+
+function subscribeTopic(acked){
+    if(nextSubscription===0) resetSubscribe();
+    if(logVerbose) timestamp("Subscribing to topic:" + nextSubscription);
+    var subscribedTopic = "/" + (zeroPadTopics? pad(nextSubscription,4): nextSubscription);
+    client.subscribe(subscribedTopic, subscribeOpts, function(err, granted){
+        if(err) {
+            throw err;
+        }
+        else {
+            if(acked){
+                acked();
+            }
+        }
+    });
+    nextSubscription++;
+    if(nextSubscription===targetCount) reportSend();
+}
+
 
 function send(acked){
     if(nextMessageOut===0) resetSend();
