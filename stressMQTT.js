@@ -4,16 +4,19 @@ var mqtt = require("mqtt");
 
 var spawnBroker = true;
 
-var serverType = "mosca";
-//var serverType = "aedes";
+//var serverType = "mosca";
+var serverType = "aedes";
 //var serverType = "mosquitto";
+
 var logVerbose = true;
+
+var reporterId;
 
 var uri = "ws://127.0.0.1:3000";
 var subscribeOpts = { qos:1 };
 var publishOpts = { qos:1, retain:true };
 
-var targetCount = 10000;                //the number of messages to be sent and received
+var targetCount = 10;                //the number of messages to be sent and received
 var requireOrder = true;                //check that messages are delivered in numerical order (the order they were sent)
 var zeroPadTopics = true;               //workaround for out-of-order lexically-based delivery from mosca
 var ignoreReconnectionErrors = true;    //ignore duplicate 'onconnect' events from Mosca or Aedes
@@ -44,6 +47,9 @@ describe("All the tests", function(){
 
     beforeEach(function(done){
         resetTimestamp();
+
+        reporterId = setInterval(reportAll, 10000);
+
         nextSubscription = 0;
         nextMessageOut = 0;
         nextMessageIn = 0;
@@ -75,6 +81,7 @@ describe("All the tests", function(){
     });
 
     afterEach(function(done){
+        clearInterval(reporterId);
         client.end(true, function(){
             client = null;
             daemon.kill(function(){
@@ -120,7 +127,6 @@ describe("All the tests", function(){
                     resetSubscribe();
                     subscribeAll();
                 });
-                reportSend();
             }
         }
     });
@@ -143,7 +149,6 @@ describe("All the tests", function(){
                         subscribeTopic();
                     }
                 });
-                reportSend();
             }
         }
     });
@@ -204,6 +209,12 @@ function reportSubscribe(){
     timestamp("Subscribed to " + nextSubscription + " topics in " + period + " ms at " + (period / nextSubscription) + "ms/topic");
 }
 
+function reportAll(){
+    reportSend();
+    reportReceive();
+    reportSubscribe();
+}
+
 
 function pad(n, width, z) {
     z = z || '0';
@@ -239,7 +250,7 @@ function subscribeTopic(acked){
         }
     });
     nextSubscription++;
-    if(nextSubscription===targetCount) reportSend();
+    if(nextSubscription===targetCount) reportSubscribe();
 }
 
 
